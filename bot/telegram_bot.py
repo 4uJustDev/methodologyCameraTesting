@@ -1,5 +1,5 @@
 from aiogram import Bot, Router, F
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.enums import ContentType
 from dotenv import load_dotenv
@@ -14,7 +14,9 @@ load_dotenv()
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN не найден в .env файле! Укажи его в .env как TELEGRAM_BOT_TOKEN=your_token")
+    raise ValueError(
+        "TELEGRAM_BOT_TOKEN не найден в .env файле! Укажи его в .env как TELEGRAM_BOT_TOKEN=your_token"
+    )
 
 bot = Bot(token=TOKEN)
 
@@ -25,7 +27,9 @@ repo = RatingRepository()
 
 @router.message(Command(commands=["start"]))
 async def send_welcome(message: Message):
-    await message.reply("Привет! Отправь фото как документ с подписью (модель телефона), и я его проанализирую!")
+    await message.reply(
+        "Привет! Отправь фото как документ с подписью (модель телефона), и я его проанализирую!"
+    )
 
 
 @router.message(F.content_type == ContentType.DOCUMENT)
