@@ -35,6 +35,10 @@ class Rating(Base):
     white_balance = Column(Float)
     contrast_ratio = Column(Float)
     total_score = Column(Float)
+    glare_count = Column(Integer)
+    glare_area_ratio = Column(Float)
+    glare_chart = Column(String)
+    calculate_glare = Column(Float)
 
     # Связь с моделью телефона
     phone_model = relationship("PhoneModel")

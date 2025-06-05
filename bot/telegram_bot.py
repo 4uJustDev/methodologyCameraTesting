@@ -59,6 +59,7 @@ ANALYSIS_METHODS = {
     "method3": "Метод 3 - Шум",
     "method4": "Метод 4 - Сверхрешётка",
     "method5": "Метод 5 - Цвет",
+    "method6": "Метод 6 - Блики",
 }
 
 # Метрики для каждого метода
@@ -77,6 +78,7 @@ METHOD_METRICS = {
         "white_balance",
         "contrast_ratio"
     ],
+    "method6": ["glare_count", "glare_area_ratio", "glare_chart"],
 }
 
 user_methods = {}
@@ -385,6 +387,45 @@ async def callback_method_selected(callback):
                             response += f"\n• Виньетирование: {metrics['vignetting']:.2f} {emoji}\n" \
                                         f"Чем ближе значение к 0 - тем хуже, чем ближе к 10 - тем лучше\n"
 
+                    elif method_id == "method3":
+                        if "noise" in metrics:
+                            response += f"• Уровень шума: {metrics['noise']:.2f}\n"
+                        if "aberration_chart" in metrics:
+                            await callback.message.answer_photo(
+                                FSInputFile(metrics["aberration_chart"]),
+                                caption="Визуализация уровня шума"
+                            )
+                            os.remove(metrics["aberration_chart"])
+                    elif method_id == "method1":
+                        if "chromatic_aberration" in metrics:
+                            response += f"• Хроматическая аберрация: {metrics['chromatic_aberration']:.2f}\n"
+
+                        if "aberration_chart" in metrics:
+                            await callback.message.answer_photo(
+                                FSInputFile(metrics["aberration_chart"]),
+                                caption="Визуализация хроматической аберрации"
+                            )
+                            os.remove(metrics["aberration_chart"])
+                    elif method_id == "method6":
+                        photos = [row.photo_name for row in ratings]
+                        glare_counts = [getattr(row, 'glare_count', 0) for row in ratings]
+                        glare_areas = [getattr(row, 'glare_area_ratio', 0) for row in ratings]
+                        plt.figure(figsize=(12, 6))
+                        plt.subplot(1, 2, 1)
+                        plt.bar(photos, glare_counts, color='red')
+                        plt.title('Количество бликов')
+                        plt.ylabel('Число бликов')
+                        plt.xticks(rotation=45, ha="right")
+                        plt.subplot(1, 2, 2)
+                        plt.bar(photos, glare_areas, color='orange')
+                        plt.title('Площадь бликов (доля)')
+                        plt.ylabel('Доля площади')
+                        plt.xticks(rotation=45, ha="right")
+                        plt.tight_layout()
+                        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                            plt.savefig(tmp.name, bbox_inches="tight", dpi=300)
+                            plt.close()
+                            response += f"• Блики: {metrics['glare_count']} бликов, площадь {metrics['glare_area_ratio']:.2f} доли площади\n"
                     else:  # Остальные метрики
                         for metric, value in metrics.items():
                             metric_name = metric.replace("_", " ").title()
@@ -602,6 +643,20 @@ def create_metrics_chart(metrics, method_id, phone_model=None):
         plt.xlim(0, 10)
         plt.ylim(0, 1.2)
         plt.grid(False)
+    elif method_id == "method6":
+        # Визуализация бликов: используем сохранённую картинку
+        chart_path = metrics.get("glare_chart")
+        if chart_path:
+            img = plt.imread(chart_path)
+            plt.imshow(img)
+            plt.axis('off')
+            plt.title("Блики на изображении" + (f" - {phone_model}" if phone_model else ""))
+        else:
+            plt.text(0.5, 0.5, "Нет данных для визуализации", ha='center', va='center')
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            plt.savefig(tmp.name, bbox_inches="tight", dpi=300)
+            plt.close()
+            return tmp.name
     else:
         # Для остальных методов создаем круговую диаграмму
         labels = []
@@ -751,6 +806,26 @@ def create_combined_chart(table, method_id):
         plt.xticks(rotation=45, ha="right")
         plt.legend()
         plt.grid(True)
+    elif method_id == "method6":
+        photos = [row.photo_name for row in table]
+        glare_counts = [getattr(row, 'glare_count', 0) for row in table]
+        glare_areas = [getattr(row, 'glare_area_ratio', 0) for row in table]
+        plt.figure(figsize=(12, 6))
+        plt.subplot(1, 2, 1)
+        plt.bar(photos, glare_counts, color='red')
+        plt.title('Количество бликов')
+        plt.ylabel('Число бликов')
+        plt.xticks(rotation=45, ha="right")
+        plt.subplot(1, 2, 2)
+        plt.bar(photos, glare_areas, color='orange')
+        plt.title('Площадь бликов (доля)')
+        plt.ylabel('Доля площади')
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            plt.savefig(tmp.name, bbox_inches="tight", dpi=300)
+            plt.close()
+            return tmp.name
     else:
         # Для остальных методов создаем линейную диаграмму
         photos = [row.photo_name for row in table]
@@ -929,7 +1004,26 @@ async def handle_photo(message: Message):
                     caption="Визуализация хроматической аберрации"
                 )
                 os.remove(method_metrics["aberration_chart"])
-
+        elif current_method == "method6":
+            photos = [row.photo_name for row in table]
+            glare_counts = [getattr(row, 'glare_count', 0) for row in table]
+            glare_areas = [getattr(row, 'glare_area_ratio', 0) for row in table]
+            plt.figure(figsize=(12, 6))
+            plt.subplot(1, 2, 1)
+            plt.bar(photos, glare_counts, color='red')
+            plt.title('Количество бликов')
+            plt.ylabel('Число бликов')
+            plt.xticks(rotation=45, ha="right")
+            plt.subplot(1, 2, 2)
+            plt.bar(photos, glare_areas, color='orange')
+            plt.title('Площадь бликов (доля)')
+            plt.ylabel('Доля площади')
+            plt.xticks(rotation=45, ha="right")
+            plt.tight_layout()
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                plt.savefig(tmp.name, bbox_inches="tight", dpi=300)
+                plt.close()
+                response += f"• Блики: {method_metrics['glare_count']} бликов, площадь {method_metrics['glare_area_ratio']:.2f} доли площади\n"
         else:  # Остальные метрики
             for metric, value in method_metrics.items():
                 metric_name = metric.replace("_", " ").title()

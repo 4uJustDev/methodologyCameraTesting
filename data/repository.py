@@ -93,6 +93,10 @@ class RatingRepository:
                     Rating.white_balance,
                     Rating.contrast_ratio,
                     Rating.total_score,
+                    Rating.glare_count,
+                    Rating.glare_area_ratio,
+                    Rating.glare_chart,
+                    Rating.calculate_glare,
                 )
                 .join(Rating, PhoneModel.id == Rating.phone_model_id)
                 .filter(Rating.analysis_method == analysis_method)
