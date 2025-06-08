@@ -1,59 +1,59 @@
-from sqlalchemy.orm import Session
-from data.models import Rating, PhoneModel
-from data.db import engine
-from sqlalchemy import func
-from sqlalchemy import desc
+from sqlalchemy import select
+from data.models import PhoneModel, Rating
+from data.db import async_session
 
 
 class RatingRepository:
-    def __init__(self):
-        self.engine = engine
-
-    def initialize_default_models(self):
+    async def initialize_default_models(self):
         """Инициализация предустановленных моделей телефонов."""
-        with Session(self.engine) as session:
+        async with async_session() as session:
             default_models = ["iPhone 14", "iPhone 15", "iPhone 16"]
             for model_name in default_models:
-                existing_model = (
-                    session.query(PhoneModel).filter_by(name=model_name).first()
+                result = await session.execute(
+                    select(PhoneModel).where(PhoneModel.name == model_name)
                 )
+                existing_model = result.scalar_one_or_none()
                 if not existing_model:
                     new_model = PhoneModel(name=model_name, is_default=True)
                     session.add(new_model)
-            session.commit()
+            await session.commit()
 
-    def add_phone_model(self, model_name: str) -> PhoneModel:
+    async def add_phone_model(self, model_name: str) -> PhoneModel:
         """Добавление новой модели телефона."""
-        with Session(self.engine) as session:
-            # Проверяем, существует ли уже такая модель
-            existing_model = (
-                session.query(PhoneModel).filter_by(name=model_name).first()
+        async with async_session() as session:
+            result = await session.execute(
+                select(PhoneModel).where(PhoneModel.name == model_name)
             )
+            existing_model = result.scalar_one_or_none()
+
             if existing_model:
                 return existing_model
 
-            # Создаем новую модель
             new_model = PhoneModel(name=model_name, is_default=False)
             session.add(new_model)
-            session.commit()
-            session.refresh(new_model)
+            await session.commit()
+            await session.refresh(new_model)
             return new_model
 
-    def get_all_phone_models(self):
+    async def get_all_phone_models(self):
         """Получение списка всех моделей телефонов."""
-        with Session(self.engine) as session:
-            return session.query(PhoneModel).all()
+        async with async_session() as session:
+            result = await session.execute(select(PhoneModel))
+            return result.scalars().all()
 
-    def get_phone_model(self, model_name: str) -> PhoneModel:
+    async def get_phone_model(self, model_name: str) -> PhoneModel:
         """Получение модели телефона по имени."""
-        with Session(self.engine) as session:
-            return session.query(PhoneModel).filter_by(name=model_name).first()
+        async with async_session() as session:
+            result = await session.execute(
+                select(PhoneModel).where(PhoneModel.name == model_name)
+            )
+            return result.scalar_one_or_none()
 
-    def add_rating(
+    async def add_rating(
         self, phone_model_id: int, photo_name: str, metrics: dict, analysis_method: str
     ):
         """Добавление нового рейтинга."""
-        with Session(self.engine) as session:
+        async with async_session() as session:
             rating = Rating(
                 phone_model_id=phone_model_id,
                 photo_name=photo_name,
@@ -61,40 +61,39 @@ class RatingRepository:
                 **metrics,
             )
             session.add(rating)
-            session.commit()
+            await session.commit()
 
-    def get_ratings_by_model_and_method(
+    async def get_ratings_by_model_and_method(
         self, phone_model_id: int, analysis_method: str
     ):
         """Получение рейтингов для конкретной модели и метода анализа."""
-        with Session(self.engine) as session:
-            return (
-                session.query(Rating)
-                .filter_by(
-                    phone_model_id=phone_model_id, analysis_method=analysis_method
+        async with async_session() as session:
+            result = await session.execute(
+                select(Rating).where(
+                    Rating.phone_model_id == phone_model_id,
+                    Rating.analysis_method == analysis_method,
                 )
-                .all()
             )
+            return result.scalars().all()
 
-    def get_average_ratings(self, analysis_method: str):
+    async def get_average_ratings(self, analysis_method: str):
         """Получение средних рейтингов по всем моделям для конкретного метода анализа."""
-        with Session(self.engine) as session:
-            return (
-                session.query(
+        async with async_session() as session:
+            result = await session.execute(
+                select(
                     PhoneModel.name.label("phone_model"),
                     Rating.photo_name,
                     Rating.chromatic_aberration,
                     Rating.vignetting,
-                    Rating.hist, # Просьба в данной строчке не менять ничего, или сообщить Хромых ИА об изменениях
-                    Rating.bin_edges, # Просьба в данной строчке не менять ничего, или сообщить Хромых ИА об изменениях
+                    Rating.hist,  # Просьба в данной строчке не менять ничего, или сообщить Хромых ИА об изменениях
+                    Rating.bin_edges,  # Просьба в данной строчке не менять ничего, или сообщить Хромых ИА об изменениях
                     Rating.noise,
                     Rating.sharpness,
                     Rating.color_gamut,
                     Rating.white_balance,
                     Rating.contrast_ratio,
                     Rating.total_score,
-                )
-                .join(Rating, PhoneModel.id == Rating.phone_model_id)
-                .filter(Rating.analysis_method == analysis_method)
-                .all()
+                ).join(Rating, PhoneModel.id == Rating.phone_model_id)
+                .where(Rating.analysis_method == analysis_method)
             )
+            return result.all()

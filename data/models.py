@@ -1,9 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from data.db import engine
-
-Base = declarative_base()
+from data.db import Base
 
 
 class PhoneModel(Base):
@@ -38,6 +36,3 @@ class Rating(Base):
 
     # Связь с моделью телефона
     phone_model = relationship("PhoneModel")
-
-
-Base.metadata.create_all(bind=engine)
